@@ -1,0 +1,62 @@
+using System.ComponentModel;
+using AzureDevOpsMcpServer.Models;
+using AzureDevOpsMcpServer.Services;
+using ModelContextProtocol.Server;
+
+namespace AzureDevOpsMcpServer.Tools;
+
+public class AzureDevOpsTool
+{
+    private readonly IAzureDevOpsService _azureDevOpsService;
+
+    public AzureDevOpsTool(IAzureDevOpsService azureDevOpsService)
+    {
+        _azureDevOpsService = azureDevOpsService;
+    }
+
+    [McpServerTool]
+    [Description("获取指派给用户的任务列表")]
+    public async Task<IEnumerable<TaskItem>> GetAssignedTasks(
+        [Description("用户ID")] string userId,
+        [Description("项目ID")] string projectId)
+    {
+        return await _azureDevOpsService.GetAssignedTasksAsync(userId, projectId);
+    }
+
+    [McpServerTool]
+    [Description("更新任务状态")]
+    public async Task<TaskItem?> UpdateTaskStatus(
+        [Description("任务ID")] string taskId,
+        [Description("任务状态 (NotStarted, InProgress, Blocked, Archived)")] string status)
+    {
+        if (!Enum.TryParse<Models.TaskStatus>(status, out var taskStatus))
+        {
+            throw new ArgumentException($"Invalid status: {status}");
+        }
+        return await _azureDevOpsService.UpdateTaskStatusAsync(taskId, taskStatus);
+    }
+
+    [McpServerTool]
+    [Description("获取任务详细信息")]
+    public async Task<TaskItem?> GetTaskDetails(
+        [Description("任务ID")] string taskId)
+    {
+        return await _azureDevOpsService.GetTaskDetailsAsync(taskId);
+    }
+
+    [McpServerTool]
+    [Description("获取用户可访问的项目列表")]
+    public async Task<IEnumerable<Project>> GetProjects(
+        [Description("用户ID")] string userId)
+    {
+        return await _azureDevOpsService.GetProjectsAsync(userId);
+    }
+
+    [McpServerTool]
+    [Description("获取任务状态变更历史")]
+    public async Task<IEnumerable<TaskHistory>> GetTaskHistory(
+        [Description("任务ID")] string taskId)
+    {
+        return await _azureDevOpsService.GetTaskHistoryAsync(taskId);
+    }
+}
