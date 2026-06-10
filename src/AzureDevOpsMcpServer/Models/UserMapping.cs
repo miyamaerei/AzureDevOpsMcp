@@ -23,4 +23,9 @@ public class UserMapping
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    
+    /// <summary>
+    /// 最后使用时间
+    /// </summary>
+    public DateTime? LastUsed { get; set; }
 }

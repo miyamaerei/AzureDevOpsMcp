@@ -10,6 +10,7 @@ public class AppDbContext : DbContext
     public DbSet<ProjectMapping> ProjectMappings { get; set; } = null!;
     public DbSet<TaskStateHistory> TaskHistories { get; set; } = null!;
     public DbSet<UserMapping> UserMappings { get; set; } = null!;
+    public DbSet<TaskSyncRecord> TaskSyncRecords { get; set; } = null!;
 
     public AppDbContext()
     {

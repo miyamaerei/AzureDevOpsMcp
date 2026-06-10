@@ -11,8 +11,8 @@ namespace AzureDevOpsMcpServer.Tests;
 public class WorkItemStateSyncTests
 {
     [Theory]
-    [InlineData("New", Models.TaskStatus.NotStarted)]
-    [InlineData("Active", Models.TaskStatus.InProgress)]
+    [InlineData("New", Models.TaskStatus.NotImplemented)]
+    [InlineData("Active", Models.TaskStatus.Current)]
     [InlineData("Resolved", Models.TaskStatus.Blocked)]
     [InlineData("Closed", Models.TaskStatus.Archived)]
     public async Task UpdateWorkItemStateAsync_ValidState_UpdatesInAzureDevOps(string inputState, Models.TaskStatus expectedStatus)

@@ -7,7 +7,7 @@
 
 ## Session Summary
 
-本次会话完成了 Azure DevOps MCP Server 的 4 个关键问题修复，采用 TDD（测试驱动开发）方法。所有 30 个测试通过。
+本次会话完成了 Azure DevOps MCP Server 的 6 个关键问题修复，采用 TDD（测试驱动开发）方法。所有 49 个测试通过。
 
 ---
 
@@ -39,12 +39,12 @@
 - HTTP 传输使用 `ModelContextProtocol.AspNetCore` 包的 `WithHttpTransport()`
 - Windows 集成认证使用 `Microsoft.AspNetCore.Authentication.Negotiate` 包
 - 通过 `MCP_REQUIRE_AUTH` 环境变量控制是否需要认证（默认 true）
+- 通过 `MCP_HTTP_PORT` 环境变量配置 HTTP 端口（默认 5000）
 
 **环境变量配置：**
 ```powershell
 $env:MCP_TRANSPORT_MODE = "Http"           # 或 "Stdio"
 $env:MCP_HTTP_PORT = "5000"                 # HTTP 端口
-$env:MCP_USE_HTTPS = "true"                 # 是否使用 HTTPS
 $env:MCP_REQUIRE_AUTH = "true"              # 是否需要认证
 ```
 
@@ -85,19 +85,34 @@ $env:MCP_REQUIRE_AUTH = "true"              # 是否需要认证
 
 ### Issue #6: 状态同步到 Azure DevOps ✅
 **Status:** Completed
-**Files Verified:**
-- `src/AzureDevOpsMcpServer/Services/AzureDevOpsApiService.cs` - `UpdateWorkItemStateAsync` 已实现
+**Files Modified:**
+- `src/AzureDevOpsMcpServer/Models/TaskSyncRecord.cs` - 同步记录模型
+- `src/AzureDevOpsMcpServer/Services/TaskSyncService.cs` - 任务同步服务接口和实现
+- `src/AzureDevOpsMcpServer/Services/TaskSyncBackgroundService.cs` - 后台定时同步服务
+- `src/AzureDevOpsMcpServer/Tools/SyncTaskTool.cs` - MCP 同步工具
+- `src/AzureDevOpsMcpServer/Services/AppDbContext.cs` - 添加同步记录实体
 
 **Key Implementation:**
-- 使用 `JsonPatchDocument` 更新 Azure DevOps WorkItem 状态
-- 支持 New, Active, Resolved, Closed 状态转换
+- `ITaskSyncService` 接口提供同步操作方法
+- `SyncTaskToAzureDevOpsAsync` - 同步单个任务
+- `SyncAllPendingTasksAsync` - 同步所有待同步任务（归档状态）
+- `SyncTaskByWorkItemIdAsync` - 按 WorkItemId 同步
+- `GetSyncHistoryAsync` - 获取同步历史记录
+- `TaskSyncBackgroundService` - 后台服务，支持定时同步（默认 5 分钟间隔）
+- 支持自动同步触发（任务归档时）
+
+**同步配置环境变量：**
+```powershell
+$env:TASK_SYNC_INTERVAL_MINUTES = "5"       # 定时同步间隔（分钟）
+$env:TASK_SYNC_AUTO_ON_ARCHIVE = "true"     # 任务归档时自动同步
+```
 
 ---
 
 ## Test Results
 
-**Total Tests:** 30
-**Passed:** 30
+**Total Tests:** 49
+**Passed:** 49
 **Failed:** 0
 **Skipped:** 0
 
@@ -106,6 +121,7 @@ $env:MCP_REQUIRE_AUTH = "true"              # 是否需要认证
 - `tests/AzureDevOpsMcpServer.Tests/GetProjectsWithUserFilterTests.cs`
 - `tests/AzureDevOpsMcpServer.Tests/ProjectMappingEnhancedTests.cs`
 - `tests/AzureDevOpsMcpServer.Tests/WorkItemStateSyncTests.cs`
+- `tests/AzureDevOpsMcpServer.Tests/TaskSyncServiceTests.cs`
 
 ---
 
@@ -122,12 +138,21 @@ $env:MCP_REQUIRE_AUTH = "true"              # 是否需要认证
 ### Service Layer
 - `IAzureDevOpsApiService` - Azure DevOps API 抽象接口
 - `MappingService` - 本地项目与 Azure DevOps 项目映射管理
+- `UserMappingService` - Windows 用户与 Azure DevOps 用户映射管理
+- `ITaskSyncService` - 任务同步服务
 - `AppDbContext` - EF Core 数据库上下文
+- `IUserContext` - 当前用户上下文
 
 ### MCP Tools
 - `WorkItemTool` - WorkItem 查询和操作
 - `TaskHistoryTool` - 任务历史查询
 - `ProjectRepositoryTool` - 项目和仓库查询
+- `ProjectMappingTool` - 项目映射管理
+- `UserMappingTool` - 用户映射管理
+- `SyncTaskTool` - 任务同步工具
+
+### Background Services
+- `TaskSyncBackgroundService` - 定时同步后台服务
 
 ---
 
@@ -155,6 +180,8 @@ $env:MCP_REQUIRE_AUTH = "true"              # 是否需要认证
 2. **实现用户过滤** - 完善 `GetProjectsAsync(userId)` 的实际过滤逻辑
 3. **添加集成测试** - 编写与真实 Azure DevOps 实例的集成测试
 4. **HTTP 端点测试** - 使用 Trae 或 Postman 测试 HTTP 传输模式
+5. **创建初始化脚本** - 实现项目初始化的 PowerShell/Shell 脚本
+6. **创建配置模板** - 提供 MCP 配置、CONTEXT.md 等模板文件
 
 ---
 
@@ -178,8 +205,13 @@ dotnet build
 cd e:\git\test_dev_flow\tests\AzureDevOpsMcpServer.Tests
 dotnet test
 
-# 运行 MCP Server
+# 运行 MCP Server（Stdio 模式）
 cd e:\git\test_dev_flow\src\AzureDevOpsMcpServer
+dotnet run
+
+# 运行 MCP Server（HTTP 模式）
+$env:MCP_TRANSPORT_MODE = "Http"
+$env:MCP_HTTP_PORT = "5000"
 dotnet run
 ```
 

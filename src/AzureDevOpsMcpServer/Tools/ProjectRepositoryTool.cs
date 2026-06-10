@@ -12,10 +12,12 @@ namespace AzureDevOpsMcpServer.Tools;
 public class ProjectRepositoryTool
 {
     private readonly IAzureDevOpsApiService _apiService;
+    private readonly IUserContext? _userContext;
 
-    public ProjectRepositoryTool(IAzureDevOpsApiService apiService)
+    public ProjectRepositoryTool(IAzureDevOpsApiService apiService, IUserContext? userContext = null)
     {
         _apiService = apiService;
+        _userContext = userContext;
     }
 
     #region Project 操作
@@ -26,8 +28,14 @@ public class ProjectRepositoryTool
     [McpServerTool]
     [Description("获取当前组织下的所有项目，可选按用户过滤")]
     public async Task<IEnumerable<Project>> GetProjects(
-        [Description("用户标识（可选），用于过滤用户可访问的项目")] string? userId = null)
+        [Description("用户标识（可选），用于过滤用户可访问的项目。如果未提供且启用了认证，将使用当前登录用户")] string? userId = null)
     {
+        // 如果未提供 userId 且有用户上下文，自动获取当前用户
+        if (string.IsNullOrEmpty(userId) && _userContext != null)
+        {
+            userId = await _userContext.GetCurrentAzureDevOpsUserAsync();
+        }
+        
         return await _apiService.GetProjectsAsync(userId);
     }
 

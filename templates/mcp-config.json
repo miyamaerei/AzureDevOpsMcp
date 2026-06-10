@@ -1,0 +1,16 @@
+{
+  "server": {
+    "transport": "http",
+    "endpoint": "http://localhost:5000",
+    "requireAuth": true,
+    "timeout": 30
+  },
+  "azureDevOps": {
+    "organization": "",
+    "project": ""
+  },
+  "sync": {
+    "intervalMinutes": 5,
+    "autoSyncOnArchive": true
+  }
+}

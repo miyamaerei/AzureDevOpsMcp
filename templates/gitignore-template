@@ -1,0 +1,50 @@
+# .gitignore Template for Development Management Platform
+
+# Dependencies
+node_modules/
+packages/
+
+# Build outputs
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+
+# GitNexus
+.gitnexus/
+
+# MCP Configuration
+.claude/
+.cursor/
+.mcp/
+mcp.json
+
+# Configuration files
+appsettings.json
+local.settings.json
+secrets.json
+
+# Logs
+logs/
+*.log
+*.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.bak
+
+# IDE
+.idea/
+.vscode/
+*.sln.docstates
+
+# Test results
+TestResults/
+*.trx
+
+# NuGet
+*.nupkg
+.nuget/

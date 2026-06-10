@@ -17,8 +17,8 @@ public class TaskHistoryModelTests
         // Assert
         Assert.Equal(Guid.Empty, history.Id);
         Assert.Equal(string.Empty, history.WorkItemId);
-        Assert.Equal(Models.TaskStatus.NotStarted, history.OldStatus);
-        Assert.Equal(Models.TaskStatus.NotStarted, history.NewStatus);
+        Assert.Equal(Models.TaskStatus.NotImplemented, history.OldStatus);
+        Assert.Equal(Models.TaskStatus.NotImplemented, history.NewStatus);
         Assert.Equal(string.Empty, history.ChangedBy);
         Assert.Equal(default, history.ChangedAt);
     }
@@ -29,7 +29,7 @@ public class TaskHistoryModelTests
         // Arrange
         var id = Guid.NewGuid();
         var workItemId = "12345";
-        var oldStatus = Models.TaskStatus.InProgress;
+        var oldStatus = Models.TaskStatus.Current;
         var newStatus = Models.TaskStatus.Archived;
         var changedBy = "user@company.com";
         var changedAt = DateTime.UtcNow;

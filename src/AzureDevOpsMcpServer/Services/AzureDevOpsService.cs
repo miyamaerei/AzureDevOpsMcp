@@ -73,7 +73,7 @@ public class AzureDevOpsService : IAzureDevOpsService
             new TaskHistory
             {
                 ChangedAt = task.CreatedAt,
-                OldStatus = Models.TaskStatus.NotStarted,
+                OldStatus = Models.TaskStatus.NotImplemented,
                 NewStatus = task.Status,
                 ChangedBy = "System"
             }
@@ -110,7 +110,7 @@ public class AzureDevOpsService : IAzureDevOpsService
                 AssignedTo = "user@example.com",
                 ProjectId = "proj-1",
                 ProjectName = "Sample Project",
-                Status = Models.TaskStatus.NotStarted,
+                Status = Models.TaskStatus.NotImplemented,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             },
@@ -123,7 +123,7 @@ public class AzureDevOpsService : IAzureDevOpsService
                 AssignedTo = "user@example.com",
                 ProjectId = "proj-1",
                 ProjectName = "Sample Project",
-                Status = Models.TaskStatus.InProgress,
+                Status = Models.TaskStatus.Current,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             }

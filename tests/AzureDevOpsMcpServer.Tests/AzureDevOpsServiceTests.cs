@@ -71,16 +71,16 @@ public class AzureDevOpsServiceTests
             Id = Guid.NewGuid(),
             AzureDevOpsId = "task-1",
             Title = "Test Task",
-            Status = Models.TaskStatus.NotStarted
+            Status = Models.TaskStatus.NotImplemented
         };
         await dbContext.Tasks.AddAsync(task);
         await dbContext.SaveChangesAsync();
 
         var service = new AzureDevOpsService(dbContext);
-        var result = await service.UpdateTaskStatusAsync(task.Id.ToString(), Models.TaskStatus.InProgress);
+        var result = await service.UpdateTaskStatusAsync(task.Id.ToString(), Models.TaskStatus.Current);
 
         Assert.NotNull(result);
-        Assert.Equal(Models.TaskStatus.InProgress, result.Status);
+        Assert.Equal(Models.TaskStatus.Current, result.Status);
     }
 
     [Fact]
@@ -93,7 +93,7 @@ public class AzureDevOpsServiceTests
             Id = Guid.NewGuid(),
             AzureDevOpsId = "task-1",
             Title = "Test Task",
-            Status = Models.TaskStatus.InProgress,
+            Status = Models.TaskStatus.Current,
             CompletedAt = null
         };
         await dbContext.Tasks.AddAsync(task);
@@ -113,7 +113,7 @@ public class AzureDevOpsServiceTests
         using var dbContext = CreateInMemoryDbContext();
         var service = new AzureDevOpsService(dbContext);
 
-        var result = await service.UpdateTaskStatusAsync(Guid.NewGuid().ToString(), Models.TaskStatus.InProgress);
+        var result = await service.UpdateTaskStatusAsync(Guid.NewGuid().ToString(), Models.TaskStatus.Current);
 
         Assert.Null(result);
     }
@@ -170,7 +170,7 @@ public class AzureDevOpsServiceTests
             Id = Guid.NewGuid(),
             AzureDevOpsId = "task-1",
             Title = "Test Task",
-            Status = Models.TaskStatus.InProgress,
+            Status = Models.TaskStatus.Current,
             CreatedAt = DateTime.UtcNow.AddHours(-1)
         };
         await dbContext.Tasks.AddAsync(task);

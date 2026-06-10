@@ -1,5 +1,6 @@
 using AzureDevOpsMcpServer.Models;
 using AzureDevOpsMcpServer.Services;
+using AzureDevOpsMcpServer.Tools;
 using Moq;
 using Xunit;
 
@@ -54,5 +55,145 @@ public class GetProjectsWithUserFilterTests
         // Assert
         Assert.NotNull(result);
         Assert.Single(result);
+    }
+
+    [Fact]
+    public async Task GetProjectsAsync_EmptyUserId_ReturnsAllProjects()
+    {
+        // Arrange
+        var apiService = new Mock<IAzureDevOpsApiService>();
+        
+        var expectedProjects = new List<Project>
+        {
+            new Project { Id = Guid.NewGuid(), Name = "Project1" },
+            new Project { Id = Guid.NewGuid(), Name = "Project2" }
+        };
+        
+        apiService.Setup(x => x.GetProjectsAsync(string.Empty))
+            .ReturnsAsync(expectedProjects);
+        
+        // Act
+        var result = await apiService.Object.GetProjectsAsync(string.Empty);
+        
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Count());
+    }
+
+    [Fact]
+    public async Task ProjectRepositoryTool_GetProjects_WithUserContext_UsesCurrentUser()
+    {
+        // Arrange
+        var apiService = new Mock<IAzureDevOpsApiService>();
+        var userContext = new Mock<IUserContext>();
+        
+        var expectedUserId = "current.user@company.com";
+        var expectedProjects = new List<Project>
+        {
+            new Project { Id = Guid.NewGuid(), Name = "Project1" }
+        };
+        
+        userContext.Setup(x => x.GetCurrentAzureDevOpsUserAsync())
+            .ReturnsAsync(expectedUserId);
+        
+        apiService.Setup(x => x.GetProjectsAsync(expectedUserId))
+            .ReturnsAsync(expectedProjects);
+        
+        var tool = new ProjectRepositoryTool(apiService.Object, userContext.Object);
+        
+        // Act
+        var result = await tool.GetProjects();
+        
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result);
+        apiService.Verify(x => x.GetProjectsAsync(expectedUserId), Times.Once);
+    }
+
+    [Fact]
+    public async Task ProjectRepositoryTool_GetProjects_WithoutUserContext_ReturnsAllProjects()
+    {
+        // Arrange
+        var apiService = new Mock<IAzureDevOpsApiService>();
+        
+        var expectedProjects = new List<Project>
+        {
+            new Project { Id = Guid.NewGuid(), Name = "Project1" },
+            new Project { Id = Guid.NewGuid(), Name = "Project2" }
+        };
+        
+        apiService.Setup(x => x.GetProjectsAsync(null))
+            .ReturnsAsync(expectedProjects);
+        
+        var tool = new ProjectRepositoryTool(apiService.Object);
+        
+        // Act
+        var result = await tool.GetProjects();
+        
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Count());
+        apiService.Verify(x => x.GetProjectsAsync(null), Times.Once);
+    }
+
+    [Fact]
+    public async Task ProjectRepositoryTool_GetProjects_ExplicitUserId_OverridesUserContext()
+    {
+        // Arrange
+        var apiService = new Mock<IAzureDevOpsApiService>();
+        var userContext = new Mock<IUserContext>();
+        
+        var explicitUserId = "explicit.user@company.com";
+        var expectedProjects = new List<Project>
+        {
+            new Project { Id = Guid.NewGuid(), Name = "Project1" }
+        };
+        
+        userContext.Setup(x => x.GetCurrentAzureDevOpsUserAsync())
+            .ReturnsAsync("different.user@company.com");
+        
+        apiService.Setup(x => x.GetProjectsAsync(explicitUserId))
+            .ReturnsAsync(expectedProjects);
+        
+        var tool = new ProjectRepositoryTool(apiService.Object, userContext.Object);
+        
+        // Act
+        var result = await tool.GetProjects(explicitUserId);
+        
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result);
+        apiService.Verify(x => x.GetProjectsAsync(explicitUserId), Times.Once);
+        userContext.Verify(x => x.GetCurrentAzureDevOpsUserAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task ProjectRepositoryTool_GetProjects_UserContextReturnsNull_ReturnsAllProjects()
+    {
+        // Arrange
+        var apiService = new Mock<IAzureDevOpsApiService>();
+        var userContext = new Mock<IUserContext>();
+        
+        var expectedProjects = new List<Project>
+        {
+            new Project { Id = Guid.NewGuid(), Name = "Project1" },
+            new Project { Id = Guid.NewGuid(), Name = "Project2" }
+        };
+        
+        userContext.Setup(x => x.GetCurrentAzureDevOpsUserAsync())
+            .ReturnsAsync((string?)null);
+        
+        apiService.Setup(x => x.GetProjectsAsync(null))
+            .ReturnsAsync(expectedProjects);
+        
+        var tool = new ProjectRepositoryTool(apiService.Object, userContext.Object);
+        
+        // Act
+        var result = await tool.GetProjects();
+        
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Count());
+        apiService.Verify(x => x.GetProjectsAsync(null), Times.Once);
     }
 }

@@ -1,0 +1,20 @@
+{
+  "mappings": [
+    {
+      "id": "",
+      "localProjectName": "",
+      "azureDevOpsProjectId": "",
+      "azureDevOpsProjectName": "",
+      "workingDirectory": "",
+      "isDefault": false,
+      "createdAt": "",
+      "updatedAt": ""
+    }
+  ],
+  "userMappings": [
+    {
+      "windowsUsername": "",
+      "azureDevOpsUser": ""
+    }
+  ]
+}

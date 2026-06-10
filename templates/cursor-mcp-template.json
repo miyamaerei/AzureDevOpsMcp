@@ -1,0 +1,17 @@
+{
+  "servers": [
+    {
+      "id": "azure-devops-mcp",
+      "name": "Azure DevOps MCP Server",
+      "url": "http://localhost:5000",
+      "protocol": "http",
+      "auth": {
+        "type": "windows-integrated"
+      },
+      "description": "Azure DevOps MCP Server for task management"
+    }
+  ],
+  "defaults": {
+    "serverId": "azure-devops-mcp"
+  }
+}

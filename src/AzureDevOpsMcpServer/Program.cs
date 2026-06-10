@@ -1,4 +1,5 @@
 using AzureDevOpsMcpServer.Configuration;
+using AzureDevOpsMcpServer.Middleware;
 using AzureDevOpsMcpServer.Services;
 using AzureDevOpsMcpServer.Tools;
 using Microsoft.AspNetCore.Authentication.Negotiate;
@@ -23,8 +24,7 @@ var pat = Environment.GetEnvironmentVariable("AZURE_DEVOPS_PAT") ?? string.Empty
 
 // Get HTTP configuration
 var httpPort = int.TryParse(Environment.GetEnvironmentVariable("MCP_HTTP_PORT"), out var port) ? port : 5000;
-var useHttps = Environment.GetEnvironmentVariable("MCP_USE_HTTPS") == "true";
-var requireAuth = Environment.GetEnvironmentVariable("MCP_REQUIRE_AUTH") != "false"; // Default true
+var requireAuth = Environment.GetEnvironmentVariable("MCP_REQUIRE_AUTH") != "false";
 
 // Create a single IMcpServerBuilder instance
 var mcpServerBuilder = builder.Services.AddMcpServer();
@@ -32,8 +32,9 @@ var mcpServerBuilder = builder.Services.AddMcpServer();
 // Configure transport based on mode
 if (transportMode.Equals("Http", StringComparison.OrdinalIgnoreCase))
 {
-    // Use HTTP transport (port and HTTPS configured via Kestrel)
+    // Use HTTP transport with port configuration
     mcpServerBuilder.WithHttpTransport();
+    Environment.SetEnvironmentVariable("ASPNETCORE_URLS", $"http://*:{httpPort}");
 }
 else
 {
@@ -47,36 +48,56 @@ if (!string.IsNullOrEmpty(orgUrl) && !string.IsNullOrEmpty(pat))
     builder.Services.AddSingleton(new AzureDevOpsConnection(orgUrl, pat));
     builder.Services.AddScoped<IAzureDevOpsApiService, AzureDevOpsApiService>();
     
-    // Register MCP tools with real API
     mcpServerBuilder
-        .WithTools<WorkItemTool>()
-        .WithTools<ProjectRepositoryTool>()
-        .WithTools<TaskHistoryTool>()
-        .WithTools<ProjectMappingTool>()
-        .WithTools<UserMappingTool>();
+            .WithTools<WorkItemTool>()
+            .WithTools<ProjectRepositoryTool>()
+            .WithTools<TaskHistoryTool>()
+            .WithTools<ProjectMappingTool>()
+            .WithTools<UserMappingTool>()
+            .WithTools<SyncTaskTool>()
+            .WithTools<MonitoringTool>()
+            .WithTools<ProjectManagerTool>();
 }
 else
 {
-    // Fallback to mock service for testing
     builder.Services.AddScoped<IAzureDevOpsService, AzureDevOpsService>();
     
     mcpServerBuilder
         .WithTools<AzureDevOpsTool>()
         .WithTools<ProjectMappingTool>()
-        .WithTools<UserMappingTool>();
+        .WithTools<UserMappingTool>()
+        .WithTools<MonitoringTool>()
+        .WithTools<ProjectManagerTool>();
 }
 
 // Add services
 builder.Services.AddScoped<MappingService>();
 builder.Services.AddScoped<UserMappingService>();
 builder.Services.AddScoped<IUserContext, UserContext>();
+builder.Services.AddScoped<ITaskSyncService, TaskSyncService>();
+builder.Services.AddScoped<ITaskStatusTransitionService, TaskStatusTransitionService>();
+builder.Services.AddHostedService<TaskSyncBackgroundService>();
+
+// Add error handling services
+builder.Services.AddScoped<IErrorHandlingService, ErrorHandlingService>();
+builder.Services.AddScoped<ILoggingService, LoggingService>();
+
+// Add performance optimization services
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<ICacheService, CacheService>();
+builder.Services.AddSingleton<IBackgroundTaskQueue, BackgroundTaskQueue>();
+builder.Services.AddScoped<IPerformanceMonitorService, PerformanceMonitorService>();
+builder.Services.AddScoped<ICachedAzureDevOpsApiService, CachedAzureDevOpsApiService>();
 
 // Configure HTTP authentication if using HTTP transport with auth required
 if (transportMode.Equals("Http", StringComparison.OrdinalIgnoreCase) && requireAuth)
 {
     builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
         .AddNegotiate();
-    builder.Services.AddAuthorization();
+    builder.Services.AddAuthorization(options =>
+    {
+        options.FallbackPolicy = options.DefaultPolicy;
+    });
 }
 
 var app = builder.Build();
@@ -87,14 +108,12 @@ using (var scope = app.Services.CreateScope())
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await dbContext.Database.EnsureCreatedAsync();
     
-    // Only initialize test data if using mock service
     var azureDevOpsService = scope.ServiceProvider.GetService<IAzureDevOpsService>();
     if (azureDevOpsService != null)
     {
         await ((AzureDevOpsService)azureDevOpsService).InitializeTestDataAsync();
     }
     
-    // Initialize UserContext
     var userContext = scope.ServiceProvider.GetRequiredService<IUserContext>();
     var currentUser = Environment.GetEnvironmentVariable("AZURE_DEVOPS_CURRENT_USER") 
                       ?? Environment.UserName;
