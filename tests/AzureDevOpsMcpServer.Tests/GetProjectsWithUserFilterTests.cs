@@ -137,37 +137,6 @@ public class GetProjectsWithUserFilterTests
     }
 
     [Fact]
-    public async Task ProjectRepositoryTool_GetProjects_ExplicitUserId_OverridesUserContext()
-    {
-        // Arrange
-        var apiService = new Mock<IAzureDevOpsApiService>();
-        var userContext = new Mock<IUserContext>();
-        
-        var explicitUserId = "explicit.user@company.com";
-        var expectedProjects = new List<Project>
-        {
-            new Project { Id = Guid.NewGuid(), Name = "Project1" }
-        };
-        
-        userContext.Setup(x => x.GetCurrentAzureDevOpsUserAsync())
-            .ReturnsAsync("different.user@company.com");
-        
-        apiService.Setup(x => x.GetProjectsAsync(explicitUserId))
-            .ReturnsAsync(expectedProjects);
-        
-        var tool = new ProjectRepositoryTool(apiService.Object, userContext.Object);
-        
-        // Act
-        var result = await tool.GetProjects(explicitUserId);
-        
-        // Assert
-        Assert.NotNull(result);
-        Assert.Single(result);
-        apiService.Verify(x => x.GetProjectsAsync(explicitUserId), Times.Once);
-        userContext.Verify(x => x.GetCurrentAzureDevOpsUserAsync(), Times.Never);
-    }
-
-    [Fact]
     public async Task ProjectRepositoryTool_GetProjects_UserContextReturnsNull_ReturnsAllProjects()
     {
         // Arrange

@@ -8,18 +8,28 @@ namespace AzureDevOpsMcpServer.Tools;
 public class AzureDevOpsTool
 {
     private readonly IAzureDevOpsService _azureDevOpsService;
+    private readonly IUserContext _userContext;
 
-    public AzureDevOpsTool(IAzureDevOpsService azureDevOpsService)
+    public AzureDevOpsTool(IAzureDevOpsService azureDevOpsService, IUserContext userContext)
     {
         _azureDevOpsService = azureDevOpsService;
+        _userContext = userContext;
     }
 
     [McpServerTool]
-    [Description("获取指派给用户的任务列表")]
+    [Description("获取指派给当前用户的任务列表")]
     public async Task<IEnumerable<TaskItem>> GetAssignedTasks(
-        [Description("用户ID")] string userId,
-        [Description("项目ID")] string projectId)
+        [Description("项目ID")] string? projectId = null)
     {
+        // 自动获取当前用户
+        var userId = await _userContext.GetCurrentAzureDevOpsUserAsync()
+            ?? throw new InvalidOperationException("无法获取当前用户");
+        
+        if (string.IsNullOrEmpty(projectId))
+        {
+            throw new ArgumentException("项目ID不能为空");
+        }
+        
         return await _azureDevOpsService.GetAssignedTasksAsync(userId, projectId);
     }
 
@@ -45,11 +55,13 @@ public class AzureDevOpsTool
     }
 
     [McpServerTool]
-    [Description("获取用户可访问的项目列表")]
-    public async Task<IEnumerable<Project>> GetProjects(
-        [Description("用户ID")] string userId)
+    [Description("获取当前用户可访问的项目列表")]
+    public async Task<IEnumerable<Project>> GetProjects()
     {
-        return await _azureDevOpsService.GetProjectsAsync(userId);
+        // 自动获取当前用户
+        var userId = await _userContext.GetCurrentAzureDevOpsUserAsync();
+        
+        return await _azureDevOpsService.GetProjectsAsync(userId ?? string.Empty);
     }
 
     [McpServerTool]

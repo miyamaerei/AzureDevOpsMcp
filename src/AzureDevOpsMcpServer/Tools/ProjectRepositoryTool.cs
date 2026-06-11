@@ -23,15 +23,15 @@ public class ProjectRepositoryTool
     #region Project 操作
 
     /// <summary>
-    /// 获取所有项目
+    /// 获取当前用户可访问的所有项目
     /// </summary>
     [McpServerTool]
-    [Description("获取当前组织下的所有项目，可选按用户过滤")]
-    public async Task<IEnumerable<Project>> GetProjects(
-        [Description("用户标识（可选），用于过滤用户可访问的项目。如果未提供且启用了认证，将使用当前登录用户")] string? userId = null)
+    [Description("获取当前组织下当前用户可访问的所有项目")]
+    public async Task<IEnumerable<Project>> GetProjects()
     {
-        // 如果未提供 userId 且有用户上下文，自动获取当前用户
-        if (string.IsNullOrEmpty(userId) && _userContext != null)
+        // 自动获取当前用户
+        string? userId = null;
+        if (_userContext != null)
         {
             userId = await _userContext.GetCurrentAzureDevOpsUserAsync();
         }

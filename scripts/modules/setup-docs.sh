@@ -164,13 +164,19 @@ EOF
         
         # 检查是否已存在
         if [ -f "$context_path" ]; then
-            print_color "$YELLOW" "  ⚠️  CONTEXT.md 已存在"
-            if [ "$SILENT" = false ]; then
-                read -p "  是否覆盖? (y/N): " overwrite
-                if [ "$overwrite" != "y" ] && [ "$overwrite" != "Y" ]; then
-                    print_color "$YELLOW" "  跳过 CONTEXT.md 生成"
-                else
-                    generate_context
+            # 检查是否由 mattpocock/skills 创建（通常包含特定格式）
+            if grep -q "行为驱动开发\|BDD\|Given-When-Then" "$context_path" 2>/dev/null; then
+                print_color "$YELLOW" "  ⚠️  CONTEXT.md 已存在（由 mattpocock/skills 创建）"
+                print_color "$YELLOW" "  建议手动编辑 CONTEXT.md 添加项目特定内容"
+            else
+                print_color "$YELLOW" "  ⚠️  CONTEXT.md 已存在"
+                if [ "$SILENT" = false ]; then
+                    read -p "  是否覆盖? (y/N): " overwrite
+                    if [ "$overwrite" != "y" ] && [ "$overwrite" != "Y" ]; then
+                        print_color "$YELLOW" "  跳过 CONTEXT.md 生成"
+                    else
+                        generate_context
+                    fi
                 fi
             fi
         else

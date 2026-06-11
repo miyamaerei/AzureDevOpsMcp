@@ -176,13 +176,6 @@ public class TaskSyncService : ITaskSyncService
     /// </summary>
     private string ConvertToAzureDevOpsState(Models.TaskStatus status)
     {
-        return status switch
-        {
-            Models.TaskStatus.NotImplemented => "New",
-            Models.TaskStatus.Current => "Active",
-            Models.TaskStatus.Blocked => "Active",
-            Models.TaskStatus.Archived => "Closed",
-            _ => "New"
-        };
+        return StateMapper.ToAzureDevOpsState(status);
     }
 }

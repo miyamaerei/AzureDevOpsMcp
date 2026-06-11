@@ -17,8 +17,8 @@ public class MappingService
     /// </summary>
     public async Task<ProjectMapping?> GetMappingByLocalProjectAsync(string localProjectName)
     {
-        var mappings = await _dbContext.ProjectMappings.ToListAsync();
-        return mappings.FirstOrDefault(pm => pm.LocalProjectName.Equals(localProjectName, StringComparison.OrdinalIgnoreCase));
+        return await _dbContext.ProjectMappings
+            .FirstOrDefaultAsync(pm => pm.LocalProjectName == localProjectName);
     }
 
     /// <summary>
@@ -26,10 +26,8 @@ public class MappingService
     /// </summary>
     public async Task<ProjectMapping?> GetMappingByWorkingDirectoryAsync(string workingDirectory)
     {
-        var mappings = await _dbContext.ProjectMappings.ToListAsync();
-        return mappings.FirstOrDefault(pm => 
-            !string.IsNullOrEmpty(pm.WorkingDirectory) && 
-            pm.WorkingDirectory.Equals(workingDirectory, StringComparison.OrdinalIgnoreCase));
+        return await _dbContext.ProjectMappings
+            .FirstOrDefaultAsync(pm => pm.WorkingDirectory == workingDirectory);
     }
 
     /// <summary>

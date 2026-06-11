@@ -29,14 +29,17 @@ public class WorkItemTool
     }
 
     /// <summary>
-    /// 获取指派给用户的 WorkItem 列表（支持无参调用使用默认项目）
+    /// 获取指派给当前用户的 WorkItem 列表（支持无参调用使用默认项目）
     /// </summary>
     [McpServerTool]
-    [Description("获取指派给指定用户的 WorkItem 列表")]
+    [Description("获取指派给当前用户的 WorkItem 列表")]
     public async Task<IEnumerable<TaskItem>> GetAssignedWorkItems(
-        [Description("用户标识 (邮箱或显示名称)")] string userId,
         [Description("项目名称或 ID（可选，不填则使用默认项目）")] string? projectId = null)
     {
+        // 自动获取当前用户
+        var userId = await _userContext.GetCurrentAzureDevOpsUserAsync()
+            ?? throw new InvalidOperationException("无法获取当前用户");
+        
         var effectiveProjectId = projectId ?? await GetDefaultProjectIdAsync();
         if (string.IsNullOrEmpty(effectiveProjectId))
         {
@@ -46,15 +49,18 @@ public class WorkItemTool
     }
 
     /// <summary>
-    /// 获取指派给用户且关联到当前默认仓库映射的 WorkItem 列表。
+    /// 获取指派给当前用户且关联到当前默认仓库映射的 WorkItem 列表。
     /// </summary>
     [McpServerTool]
-    [Description("获取指派给指定用户且通过 GitHub/Azure Repo 关系关联到当前默认仓库的 WorkItem 列表")]
+    [Description("获取指派给当前用户且通过 GitHub/Azure Repo 关系关联到当前默认仓库的 WorkItem 列表")]
     public async Task<IEnumerable<RepositoryWorkItem>> GetAssignedWorkItemsForCurrentRepository(
-        [Description("用户标识 (邮箱或显示名称)")] string userId,
         [Description("是否包含无法解析仓库关系的 WorkItem，默认 false")]
         bool includeUnresolved = false)
     {
+        // 自动获取当前用户
+        var userId = await _userContext.GetCurrentAzureDevOpsUserAsync()
+            ?? throw new InvalidOperationException("无法获取当前用户");
+        
         var mapping = await _repositoryMappingService.GetDefaultRepositoryMappingAsync(GetCurrentWindowsUsername())
             ?? throw new InvalidOperationException("没有设置默认仓库映射");
 
@@ -62,12 +68,11 @@ public class WorkItemTool
     }
 
     /// <summary>
-    /// 获取指派给用户且关联到指定仓库的 WorkItem 列表。
+    /// 获取指派给当前用户且关联到指定仓库的 WorkItem 列表。
     /// </summary>
     [McpServerTool]
-    [Description("获取指派给指定用户且通过 GitHub/Azure Repo 关系关联到指定仓库的 WorkItem 列表")]
+    [Description("获取指派给当前用户且通过 GitHub/Azure Repo 关系关联到指定仓库的 WorkItem 列表")]
     public async Task<IEnumerable<RepositoryWorkItem>> GetAssignedWorkItemsForRepository(
-        [Description("用户标识 (邮箱或显示名称)")] string userId,
         [Description("仓库提供方，例如 GitHub 或 AzureRepos")] string repositoryProvider,
         [Description("仓库 Owner；GitHub 场景为 owner/organization")] string repositoryOwner,
         [Description("仓库名称")] string repositoryName,
@@ -75,6 +80,10 @@ public class WorkItemTool
         [Description("是否包含无法解析仓库关系的 WorkItem，默认 false")]
         bool includeUnresolved = false)
     {
+        // 自动获取当前用户
+        var userId = await _userContext.GetCurrentAzureDevOpsUserAsync()
+            ?? throw new InvalidOperationException("无法获取当前用户");
+        
         var mapping = await _repositoryMappingService.GetRepositoryMappingByRepositoryIdentityAsync(
             GetCurrentWindowsUsername(),
             repositoryProvider,

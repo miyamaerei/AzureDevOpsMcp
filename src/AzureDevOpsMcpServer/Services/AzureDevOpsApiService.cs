@@ -530,19 +530,7 @@ public class AzureDevOpsApiService : IAzureDevOpsApiService
     /// </summary>
     private Models.TaskStatus ConvertStateToStatus(string? state)
     {
-        return state?.ToLowerInvariant() switch
-        {
-            "new" => Models.TaskStatus.NotImplemented,
-            "to do" => Models.TaskStatus.NotImplemented,
-            "active" => Models.TaskStatus.Current,
-            "in progress" => Models.TaskStatus.Current,
-            "resolved" => Models.TaskStatus.Current,
-            "blocked" => Models.TaskStatus.Blocked,
-            "closed" => Models.TaskStatus.Archived,
-            "done" => Models.TaskStatus.Archived,
-            "removed" => Models.TaskStatus.Archived,
-            _ => Models.TaskStatus.NotImplemented
-        };
+        return StateMapper.ToInternalStatus(state);
     }
 
     private Project ConvertToProject(TeamProject project)
