@@ -5,8 +5,15 @@ using Xunit;
 
 namespace AzureDevOpsMcpServer.Tests;
 
+/// <summary>
+/// PerformanceMonitorService 测试类
+/// 测试性能监控服务的统计记录和追踪功能
+/// </summary>
 public class PerformanceMonitorServiceTests
 {
+    /// <summary>
+    /// 测试初始状态下统计返回默认值
+    /// </summary>
     [Fact]
     public void GetStats_ShouldReturnInitialState()
     {
@@ -25,6 +32,9 @@ public class PerformanceMonitorServiceTests
         Assert.Empty(stats.OperationStats);
     }
 
+    /// <summary>
+    /// 测试记录操作时间后统计正确更新
+    /// </summary>
     [Fact]
     public void RecordOperationTime_ShouldUpdateStats()
     {
@@ -43,6 +53,9 @@ public class PerformanceMonitorServiceTests
         Assert.Equal(TimeSpan.FromMilliseconds(150), stats.AverageDuration);
     }
 
+    /// <summary>
+    /// 测试重置统计后清空所有数据
+    /// </summary>
     [Fact]
     public void ResetStats_ShouldClearAllData()
     {
@@ -61,6 +74,9 @@ public class PerformanceMonitorServiceTests
         Assert.Empty(stats.OperationStats);
     }
 
+    /// <summary>
+    /// 测试使用 TrackOperation 自动记录操作耗时
+    /// </summary>
     [Fact]
     public void TrackOperation_ShouldRecordDuration()
     {
@@ -71,7 +87,7 @@ public class PerformanceMonitorServiceTests
         // Act
         using (service.TrackOperation("TrackedOperation"))
         {
-            // Simulate operation
+            // 模拟操作耗时
             System.Threading.Thread.Sleep(10);
         }
 
