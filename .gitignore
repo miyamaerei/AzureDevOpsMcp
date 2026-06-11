@@ -89,3 +89,6 @@ build/
 .env
 .env.local
 appsettings.*.json
+
+# Local test configuration with credentials
+/tests/AzureDevOpsMcpServer.Tests/Config/test.json
