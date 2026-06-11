@@ -102,13 +102,13 @@ SetRepositoryMapping(
 **操作方式**：
 
 ```mcp
-GetAssignedWorkItemsForRepository(userId, repositoryProvider, repositoryOwner, repositoryName, projectId)
+GetAssignedWorkItemsForRepository(repositoryProvider, repositoryOwner, repositoryName, projectId)
 ```
 
 或在已配置默认仓库映射时：
 
 ```mcp
-GetAssignedWorkItemsForCurrentRepository(userId)
+GetAssignedWorkItemsForCurrentRepository()
 ```
 
 **关联依据**：
@@ -121,11 +121,12 @@ GetAssignedWorkItemsForCurrentRepository(userId)
 > 当前仓库任务拉取只以 Azure DevOps WorkItem 上已存在的关系为准，不通过 Git 或 GitHub API 扫描远程仓库对象。
 
 **参数说明**：
-- `userId`: 用户标识（可选，默认使用当前登录用户）
 - `repositoryProvider`: 仓库提供方，例如 `GitHub`
 - `repositoryOwner`: GitHub owner
 - `repositoryName`: GitHub repo 名称
 - `projectId`: Azure DevOps Project ID（可选，默认使用仓库映射中的项目）
+
+> 注意：用户标识不再需要手动传入，系统自动从当前登录用户获取。
 
 **返回内容**：
 - 任务 ID
@@ -139,7 +140,7 @@ GetAssignedWorkItemsForCurrentRepository(userId)
 - 创建时间
 - 更新时间
 
-> 注意：`GetAssignedWorkItems(userId, projectId)` 只按 Azure DevOps Project 拉取任务，不能代表“当前仓库任务”。
+> 注意：`GetAssignedWorkItems(projectId)` 只按 Azure DevOps Project 拉取任务，不能代表“当前仓库任务”。
 
 ### 4. 需求分析
 

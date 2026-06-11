@@ -19,64 +19,20 @@ public class SyncTaskTool
     }
 
     /// <summary>
-    /// 同步单个任务到 Azure DevOps
+    /// 同步指定任务到 Azure DevOps
     /// </summary>
     [McpServerTool]
     [Description("将指定任务同步到 Azure DevOps")]
-    public async Task<SyncResult> SyncTask(
+    public async Task<SyncResult> SyncTaskToAzureDevOps(
         [Description("任务 ID")] Guid taskId)
     {
         bool success = await _taskSyncService.SyncTaskToAzureDevOpsAsync(taskId);
-        
+
         return new SyncResult
         {
             Success = success,
             Message = success ? "同步成功" : "同步失败"
         };
-    }
-
-    /// <summary>
-    /// 根据 WorkItemId 同步任务
-    /// </summary>
-    [McpServerTool]
-    [Description("根据 Azure DevOps WorkItem ID 同步任务")]
-    public async Task<SyncResult> SyncTaskByWorkItemId(
-        [Description("Azure DevOps WorkItem ID")] string workItemId)
-    {
-        bool success = await _taskSyncService.SyncTaskByWorkItemIdAsync(workItemId);
-        
-        return new SyncResult
-        {
-            Success = success,
-            Message = success ? "同步成功" : "同步失败"
-        };
-    }
-
-    /// <summary>
-    /// 同步所有待同步的任务
-    /// </summary>
-    [McpServerTool]
-    [Description("同步所有待同步的任务（状态为归档的任务）")]
-    public async Task<SyncResult> SyncAllTasks()
-    {
-        bool success = await _taskSyncService.SyncAllPendingTasksAsync();
-        
-        return new SyncResult
-        {
-            Success = success,
-            Message = success ? "所有任务同步成功" : "部分任务同步失败"
-        };
-    }
-
-    /// <summary>
-    /// 获取任务的同步历史
-    /// </summary>
-    [McpServerTool]
-    [Description("获取指定任务的同步历史记录")]
-    public async Task<IEnumerable<TaskSyncRecord>> GetSyncHistory(
-        [Description("任务 ID")] Guid taskId)
-    {
-        return await _taskSyncService.GetSyncHistoryAsync(taskId);
     }
 }
 

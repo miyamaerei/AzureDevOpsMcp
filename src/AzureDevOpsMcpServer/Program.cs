@@ -50,30 +50,20 @@ if (!string.IsNullOrEmpty(orgUrl) && !string.IsNullOrEmpty(pat))
     
     mcpServerBuilder
             .WithTools<WorkItemTool>()
-            .WithTools<ProjectRepositoryTool>()
-            .WithTools<TaskHistoryTool>()
-            .WithTools<ProjectMappingTool>()
             .WithTools<RepositoryMappingTool>()
-            .WithTools<UserMappingTool>()
-            .WithTools<SyncTaskTool>()
-            .WithTools<MonitoringTool>()
-            .WithTools<ProjectManagerTool>();
+            .WithTools<SyncTaskTool>();
 }
 else
 {
     builder.Services.AddScoped<IAzureDevOpsService, AzureDevOpsService>();
     
     mcpServerBuilder
-        .WithTools<AzureDevOpsTool>()
-        .WithTools<ProjectMappingTool>()
+        .WithTools<WorkItemTool>()
         .WithTools<RepositoryMappingTool>()
-        .WithTools<UserMappingTool>()
-        .WithTools<MonitoringTool>()
-        .WithTools<ProjectManagerTool>();
+        .WithTools<SyncTaskTool>();
 }
 
 // Add services
-builder.Services.AddScoped<MappingService>();
 builder.Services.AddScoped<RepositoryMappingService>();
 builder.Services.AddScoped<UserMappingService>();
 builder.Services.AddScoped<IUserContext, UserContext>();
