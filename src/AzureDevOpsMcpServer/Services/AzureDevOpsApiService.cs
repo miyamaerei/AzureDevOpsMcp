@@ -25,6 +25,9 @@ public interface IAzureDevOpsApiService
     // WorkItem 评论操作
     Task<CommentInfo> AddWorkItemCommentAsync(int workItemId, string projectName, string text);
     
+    // WorkItem 关联操作
+    Task<bool> CreateArtifactLinkAsync(int workItemId, string artifactType, string artifactUrl);
+    
     // TaskHistory 操作
     Task<IEnumerable<TaskStateHistory>> GetTaskHistoryAsync(int workItemId);
     
@@ -269,6 +272,42 @@ public class AzureDevOpsApiService : IAzureDevOpsApiService
         catch (Exception ex)
         {
             throw new InvalidOperationException($"添加 WorkItem 评论失败: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// 为 WorkItem 创建 ArtifactLink 关联
+    /// </summary>
+    public async Task<bool> CreateArtifactLinkAsync(int workItemId, string artifactType, string artifactUrl)
+    {
+        try
+        {
+            var witClient = GetWitClient();
+            
+            var patchDocument = new Microsoft.VisualStudio.Services.WebApi.Patch.Json.JsonPatchDocument
+            {
+                new Microsoft.VisualStudio.Services.WebApi.Patch.Json.JsonPatchOperation
+                {
+                    Operation = Microsoft.VisualStudio.Services.WebApi.Patch.Operation.Add,
+                    Path = "/relations/-",
+                    Value = new
+                    {
+                        rel = artifactType,
+                        url = artifactUrl,
+                        attributes = new
+                        {
+                            comment = "Linked from MCP Server"
+                        }
+                    }
+                }
+            };
+
+            var workItem = await witClient.UpdateWorkItemAsync(patchDocument, workItemId);
+            return workItem != null;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"创建 ArtifactLink 失败: {ex.Message}", ex);
         }
     }
 

@@ -52,6 +52,20 @@ public class AzureDevOpsPublicApi
         var azureDevOpsUser = await _userContext.GetCurrentAzureDevOpsUserAsync()
             ?? throw new InvalidOperationException("无法获取当前 Azure DevOps 用户");
 
+        // 验证 Azure DevOps Project 是否存在
+        var project = await _apiService.GetProjectAsync(azureProjectId);
+        if (project == null)
+        {
+            throw new InvalidOperationException($"Azure DevOps Project '{azureProjectId}' 不存在或无权访问");
+        }
+
+        // 验证 Azure DevOps Repository 是否存在
+        var repo = await _apiService.GetRepositoryAsync(azureProjectId, repositoryId);
+        if (repo == null)
+        {
+            throw new InvalidOperationException($"Azure DevOps Repository '{repositoryId}' 在项目 '{azureProjectId}' 中不存在");
+        }
+
         var mapping = await _repositoryMappingService.CreateOrUpdateRepositoryMappingAsync(
             windowsUsername: windowsUsername,
             azureDevOpsUser: azureDevOpsUser,
@@ -68,7 +82,49 @@ public class AzureDevOpsPublicApi
             repositoryProvider: repositoryProvider,
             repositoryOwner: repositoryOwner ?? organization);
 
+        // 尝试从分支名称中提取 WorkItem ID 并自动关联
+        await TryAutoLinkWorkItems(workingDirectory, azureProjectId, repositoryName, remoteUrl);
+
         return mapping;
+    }
+
+    /// <summary>
+    /// 尝试从本地分支名称提取 WorkItem ID 并自动创建关联
+    /// </summary>
+    private async Task TryAutoLinkWorkItems(string workingDirectory, string azureProjectId, string repositoryName, string remoteUrl)
+    {
+        try
+        {
+            // 简单实现：从工作目录路径或分支名称中提取 WorkItem ID
+            // 实际实现可以扫描本地 Git 仓库获取当前分支
+            var workItemId = ExtractWorkItemIdFromPath(workingDirectory);
+            if (workItemId > 0)
+            {
+                // 创建 ArtifactLink 关联
+                var artifactType = "ArtifactLink";
+                var artifactUrl = $"{remoteUrl}/_git/{repositoryName}";
+                
+                await _apiService.CreateArtifactLinkAsync(workItemId, artifactType, artifactUrl);
+            }
+        }
+        catch (Exception)
+        {
+            // 自动关联失败不影响映射设置
+        }
+    }
+
+    /// <summary>
+    /// 从路径中提取 WorkItem ID（简单实现）
+    /// </summary>
+    private int ExtractWorkItemIdFromPath(string path)
+    {
+        // 尝试从路径中查找数字模式（如 feature/task-123 或 bugfix/456-issue）
+        var match = System.Text.RegularExpressions.Regex.Match(path, @"(?:task|bug|issue)-?(\d+)");
+        if (match.Success && int.TryParse(match.Groups[1].Value, out var id))
+        {
+            return id;
+        }
+        return 0;
     }
 
     /// <summary>

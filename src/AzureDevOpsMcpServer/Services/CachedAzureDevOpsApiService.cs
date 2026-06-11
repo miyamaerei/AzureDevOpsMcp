@@ -119,6 +119,21 @@ public class CachedAzureDevOpsApiService : ICachedAzureDevOpsApiService
     }
 
     /// <summary>
+    /// 创建 ArtifactLink 关联（不缓存，清除相关缓存）
+    /// </summary>
+    public async Task<bool> CreateArtifactLinkAsync(int workItemId, string artifactType, string artifactUrl)
+    {
+        // 清除相关缓存
+        var cacheKey = string.Format(CacheKeys.Task, workItemId);
+        _cacheService.Remove(cacheKey);
+        
+        var relationsCacheKey = $"taskWithRelations:{workItemId}";
+        _cacheService.Remove(relationsCacheKey);
+        
+        return await _apiService.CreateArtifactLinkAsync(workItemId, artifactType, artifactUrl);
+    }
+
+    /// <summary>
     /// 获取项目列表（带缓存）
     /// </summary>
     public async Task<IEnumerable<Project>> GetProjectsAsync(string? userId = null)
