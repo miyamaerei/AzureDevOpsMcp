@@ -6,6 +6,10 @@ public enum WorkItemRelationLinkType
     Branch,
     Commit,
     PullRequest,
+    GitHubBranch,
+    GitHubCommit,
+    GitHubPullRequest,
+    GitHubIssue,
     ParentWorkItem,
     ChildWorkItem
 }
@@ -27,11 +31,21 @@ public class WorkItemRelationInfo
 
     public string? RepositoryId { get; set; }
 
+    public string? RepositoryProvider { get; set; }
+
+    public string? RepositoryOwner { get; set; }
+
+    public string? RepositoryName { get; set; }
+
     public string? PullRequestId { get; set; }
 
     public string? CommitId { get; set; }
 
     public string? BranchName { get; set; }
+
+    public string? GitHubIssueId { get; set; }
+
+    public string? ExternalUrl { get; set; }
 
     public string? LinkedWorkItemId { get; set; }
 
@@ -64,6 +78,26 @@ public class WorkItemRelationInfo
             return WorkItemRelationLinkType.ChildWorkItem;
         }
 
+        if (IsGitHubRelation(name, url, "Pull Request", "pull"))
+        {
+            return WorkItemRelationLinkType.GitHubPullRequest;
+        }
+
+        if (IsGitHubRelation(name, url, "Issue", "issues"))
+        {
+            return WorkItemRelationLinkType.GitHubIssue;
+        }
+
+        if (IsGitHubRelation(name, url, "Commit", "commit"))
+        {
+            return WorkItemRelationLinkType.GitHubCommit;
+        }
+
+        if (IsGitHubRelation(name, url, "Branch", "tree"))
+        {
+            return WorkItemRelationLinkType.GitHubBranch;
+        }
+
         if (name.Contains("Pull Request", StringComparison.OrdinalIgnoreCase) ||
             url.Contains("PullRequest", StringComparison.OrdinalIgnoreCase))
         {
@@ -85,8 +119,25 @@ public class WorkItemRelationInfo
         return WorkItemRelationLinkType.Unknown;
     }
 
+    private static bool IsGitHubRelation(string name, string url, string relationNameFragment, string urlPathFragment)
+    {
+        return (name.Contains("GitHub", StringComparison.OrdinalIgnoreCase) &&
+                name.Contains(relationNameFragment, StringComparison.OrdinalIgnoreCase)) ||
+               (url.Contains("github.com", StringComparison.OrdinalIgnoreCase) &&
+                url.Contains($"/{urlPathFragment}/", StringComparison.OrdinalIgnoreCase));
+    }
+
     private void ApplyGitArtifactParts()
     {
+        if (LinkType is WorkItemRelationLinkType.GitHubBranch or
+            WorkItemRelationLinkType.GitHubCommit or
+            WorkItemRelationLinkType.GitHubPullRequest or
+            WorkItemRelationLinkType.GitHubIssue)
+        {
+            ApplyGitHubArtifactParts();
+            return;
+        }
+
         var marker = LinkType switch
         {
             WorkItemRelationLinkType.PullRequest => "PullRequestId/",
@@ -134,6 +185,50 @@ public class WorkItemRelationInfo
             {
                 BranchName = parts[2];
             }
+        }
+    }
+
+    private void ApplyGitHubArtifactParts()
+    {
+        if (!Uri.TryCreate(Url, UriKind.Absolute, out var uri) ||
+            !uri.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var parts = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2)
+        {
+            return;
+        }
+
+        RepositoryProvider = "GitHub";
+        RepositoryOwner = parts[0];
+        RepositoryName = parts[1];
+        ExternalUrl = Url;
+
+        if (parts.Length < 4)
+        {
+            return;
+        }
+
+        var objectType = parts[2];
+        var objectId = string.Join('/', parts.Skip(3));
+        if (objectType.Equals("pull", StringComparison.OrdinalIgnoreCase))
+        {
+            PullRequestId = objectId;
+        }
+        else if (objectType.Equals("commit", StringComparison.OrdinalIgnoreCase))
+        {
+            CommitId = objectId;
+        }
+        else if (objectType.Equals("tree", StringComparison.OrdinalIgnoreCase))
+        {
+            BranchName = objectId;
+        }
+        else if (objectType.Equals("issues", StringComparison.OrdinalIgnoreCase))
+        {
+            GitHubIssueId = objectId;
         }
     }
 

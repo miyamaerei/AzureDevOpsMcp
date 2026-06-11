@@ -38,6 +38,20 @@ public class RepositoryMappingService
             rm.WindowsUsername == windowsUsername && rm.IsDefault);
     }
 
+    public async Task<RepositoryMapping?> GetRepositoryMappingByRepositoryIdentityAsync(
+        string windowsUsername,
+        string repositoryProvider,
+        string repositoryOwner,
+        string repositoryName)
+    {
+        var mappings = await _dbContext.RepositoryMappings.ToListAsync();
+        return mappings.FirstOrDefault(rm =>
+            rm.WindowsUsername.Equals(windowsUsername, StringComparison.OrdinalIgnoreCase) &&
+            rm.RepositoryProvider.Equals(repositoryProvider, StringComparison.OrdinalIgnoreCase) &&
+            rm.RepositoryOwner.Equals(repositoryOwner, StringComparison.OrdinalIgnoreCase) &&
+            rm.RepositoryName.Equals(repositoryName, StringComparison.OrdinalIgnoreCase));
+    }
+
     public async Task<IEnumerable<RepositoryMapping>> GetAllRepositoryMappingsAsync(string windowsUsername)
     {
         return await _dbContext.RepositoryMappings
@@ -57,7 +71,9 @@ public class RepositoryMappingService
         string remoteUrl,
         string organization,
         bool isDefault = false,
-        string? machineName = null)
+        string? machineName = null,
+        string repositoryProvider = "AzureRepos",
+        string? repositoryOwner = null)
     {
         if (isDefault)
         {
@@ -81,6 +97,8 @@ public class RepositoryMappingService
             existingMapping.AzureDevOpsProjectId = azureDevOpsProjectId;
             existingMapping.AzureDevOpsProjectName = azureDevOpsProjectName;
             existingMapping.RepositoryId = repositoryId;
+            existingMapping.RepositoryProvider = repositoryProvider;
+            existingMapping.RepositoryOwner = repositoryOwner ?? organization;
             existingMapping.RepositoryName = repositoryName;
             existingMapping.RemoteUrl = remoteUrl;
             existingMapping.Organization = organization;
@@ -100,6 +118,8 @@ public class RepositoryMappingService
                 AzureDevOpsProjectId = azureDevOpsProjectId,
                 AzureDevOpsProjectName = azureDevOpsProjectName,
                 RepositoryId = repositoryId,
+                RepositoryProvider = repositoryProvider,
+                RepositoryOwner = repositoryOwner ?? organization,
                 RepositoryName = repositoryName,
                 RemoteUrl = remoteUrl,
                 Organization = organization,

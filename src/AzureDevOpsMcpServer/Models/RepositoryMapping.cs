@@ -46,12 +46,22 @@ public class RepositoryMapping
     public string AzureDevOpsProjectName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Azure DevOps 仓库 ID。
+    /// Azure DevOps 仓库 ID。GitHub 仓库映射可为空。
     /// </summary>
     public string RepositoryId { get; set; } = string.Empty;
 
     /// <summary>
-    /// Azure DevOps 仓库名称。
+    /// 仓库提供方，例如 GitHub 或 AzureRepos。
+    /// </summary>
+    public string RepositoryProvider { get; set; } = "AzureRepos";
+
+    /// <summary>
+    /// 仓库 Owner。GitHub 场景为 owner/organization。
+    /// </summary>
+    public string RepositoryOwner { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Azure Repo 名称或 GitHub repo 名称。
     /// </summary>
     public string RepositoryName { get; set; } = string.Empty;
 
@@ -61,7 +71,7 @@ public class RepositoryMapping
     public string RemoteUrl { get; set; } = string.Empty;
 
     /// <summary>
-    /// 组织名称。
+    /// Azure DevOps 组织名称。
     /// </summary>
     public string Organization { get; set; } = string.Empty;
 

@@ -29,11 +29,15 @@ public class RepositoryMappingTool
         [Description("Azure DevOps 项目名称")] string azureProjectName,
         [Description("Azure Repo ID")] string repositoryId,
         [Description("Azure Repo 名称")] string repositoryName,
-        [Description("Azure Repo 远程地址")] string remoteUrl,
-        [Description("组织名称")] string organization,
+        [Description("Azure Repo 或 GitHub 远程地址")] string remoteUrl,
+        [Description("Azure DevOps 组织名称")] string organization,
         [Description("本地工作目录路径（可选）")] string? workingDirectory = null,
         [Description("是否设置为默认 Repo 映射")]
-        bool isDefault = false)
+        bool isDefault = false,
+        [Description("仓库提供方，例如 AzureRepos 或 GitHub")]
+        string repositoryProvider = "AzureRepos",
+        [Description("仓库 Owner；GitHub 场景为 owner/organization")]
+        string? repositoryOwner = null)
     {
         var windowsUsername = GetCurrentWindowsUsername();
         var azureDevOpsUser = await _userContext.GetCurrentAzureDevOpsUserAsync() ?? string.Empty;
@@ -49,7 +53,9 @@ public class RepositoryMappingTool
             repositoryName,
             remoteUrl,
             organization,
-            isDefault);
+            isDefault,
+            repositoryProvider: repositoryProvider,
+            repositoryOwner: repositoryOwner);
     }
 
     [McpServerTool]
@@ -73,6 +79,20 @@ public class RepositoryMappingTool
     public async Task<RepositoryMapping?> GetDefaultRepositoryMapping()
     {
         return await _repositoryMappingService.GetDefaultRepositoryMappingAsync(GetCurrentWindowsUsername());
+    }
+
+    [McpServerTool]
+    [Description("根据仓库提供方、Owner 和名称获取当前用户仓库映射")]
+    public async Task<RepositoryMapping?> GetRepositoryMappingByRepositoryIdentity(
+        [Description("仓库提供方，例如 GitHub 或 AzureRepos")] string repositoryProvider,
+        [Description("仓库 Owner")] string repositoryOwner,
+        [Description("仓库名称")] string repositoryName)
+    {
+        return await _repositoryMappingService.GetRepositoryMappingByRepositoryIdentityAsync(
+            GetCurrentWindowsUsername(),
+            repositoryProvider,
+            repositoryOwner,
+            repositoryName);
     }
 
     [McpServerTool]

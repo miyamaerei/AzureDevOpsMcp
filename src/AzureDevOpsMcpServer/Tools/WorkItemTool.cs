@@ -46,6 +46,69 @@ public class WorkItemTool
     }
 
     /// <summary>
+    /// 获取指派给用户且关联到当前默认仓库映射的 WorkItem 列表。
+    /// </summary>
+    [McpServerTool]
+    [Description("获取指派给指定用户且通过 GitHub/Azure Repo 关系关联到当前默认仓库的 WorkItem 列表")]
+    public async Task<IEnumerable<RepositoryWorkItem>> GetAssignedWorkItemsForCurrentRepository(
+        [Description("用户标识 (邮箱或显示名称)")] string userId,
+        [Description("是否包含无法解析仓库关系的 WorkItem，默认 false")]
+        bool includeUnresolved = false)
+    {
+        var mapping = await _repositoryMappingService.GetDefaultRepositoryMappingAsync(GetCurrentWindowsUsername())
+            ?? throw new InvalidOperationException("没有设置默认仓库映射");
+
+        return await GetAssignedWorkItemsForRepositoryMapping(userId, mapping, includeUnresolved);
+    }
+
+    /// <summary>
+    /// 获取指派给用户且关联到指定仓库的 WorkItem 列表。
+    /// </summary>
+    [McpServerTool]
+    [Description("获取指派给指定用户且通过 GitHub/Azure Repo 关系关联到指定仓库的 WorkItem 列表")]
+    public async Task<IEnumerable<RepositoryWorkItem>> GetAssignedWorkItemsForRepository(
+        [Description("用户标识 (邮箱或显示名称)")] string userId,
+        [Description("仓库提供方，例如 GitHub 或 AzureRepos")] string repositoryProvider,
+        [Description("仓库 Owner；GitHub 场景为 owner/organization")] string repositoryOwner,
+        [Description("仓库名称")] string repositoryName,
+        [Description("项目名称或 ID（可选，不填则使用仓库映射中的项目）")] string? projectId = null,
+        [Description("是否包含无法解析仓库关系的 WorkItem，默认 false")]
+        bool includeUnresolved = false)
+    {
+        var mapping = await _repositoryMappingService.GetRepositoryMappingByRepositoryIdentityAsync(
+            GetCurrentWindowsUsername(),
+            repositoryProvider,
+            repositoryOwner,
+            repositoryName)
+            ?? throw new InvalidOperationException($"找不到仓库映射: {repositoryProvider}/{repositoryOwner}/{repositoryName}");
+
+        var effectiveMapping = string.IsNullOrWhiteSpace(projectId)
+            ? mapping
+            : new RepositoryMapping
+            {
+                Id = mapping.Id,
+                WindowsUsername = mapping.WindowsUsername,
+                AzureDevOpsUser = mapping.AzureDevOpsUser,
+                MachineName = mapping.MachineName,
+                LocalProjectName = mapping.LocalProjectName,
+                WorkingDirectory = mapping.WorkingDirectory,
+                AzureDevOpsProjectId = projectId,
+                AzureDevOpsProjectName = mapping.AzureDevOpsProjectName,
+                RepositoryId = mapping.RepositoryId,
+                RepositoryProvider = mapping.RepositoryProvider,
+                RepositoryOwner = mapping.RepositoryOwner,
+                RepositoryName = mapping.RepositoryName,
+                RemoteUrl = mapping.RemoteUrl,
+                Organization = mapping.Organization,
+                IsDefault = mapping.IsDefault,
+                CreatedAt = mapping.CreatedAt,
+                UpdatedAt = mapping.UpdatedAt
+            };
+
+        return await GetAssignedWorkItemsForRepositoryMapping(userId, effectiveMapping, includeUnresolved);
+    }
+
+    /// <summary>
     /// 获取 WorkItem 详情
     /// </summary>
     [McpServerTool]
@@ -100,7 +163,7 @@ public class WorkItemTool
             parentWorkItem = await _apiService.GetWorkItemDetailsWithRelationsAsync(parsedParentId);
         }
 
-        var resolved = await ResolveRepositoryMappingAsync(workItem, parentWorkItem);
+        var resolved = await ResolveRepositoryMappingAsync(workItem, parentWorkItem, allowDefaultFallback: true);
 
         return new WorkItemAssignment
         {
@@ -109,6 +172,60 @@ public class WorkItemTool
             RepositoryMapping = resolved.Mapping,
             ResolutionSource = resolved.Source
         };
+    }
+
+    private async Task<IEnumerable<RepositoryWorkItem>> GetAssignedWorkItemsForRepositoryMapping(
+        string userId,
+        RepositoryMapping targetMapping,
+        bool includeUnresolved)
+    {
+        if (string.IsNullOrWhiteSpace(targetMapping.AzureDevOpsProjectId))
+        {
+            throw new InvalidOperationException("仓库映射缺少 Azure DevOps Project ID，无法查询 Azure Boards Workitem");
+        }
+
+        var assignedWorkItems = await _apiService.GetAssignedWorkItemsAsync(userId, targetMapping.AzureDevOpsProjectId);
+        var results = new List<RepositoryWorkItem>();
+
+        foreach (var task in assignedWorkItems)
+        {
+            if (!int.TryParse(task.AzureDevOpsId, out var workItemId))
+            {
+                continue;
+            }
+
+            var workItem = await _apiService.GetWorkItemDetailsWithRelationsAsync(workItemId);
+            if (workItem == null)
+            {
+                continue;
+            }
+
+            var matchingRelations = GetMatchingRepositoryRelations(workItem.Relations, targetMapping).ToList();
+            if (matchingRelations.Count > 0)
+            {
+                results.Add(new RepositoryWorkItem
+                {
+                    WorkItem = workItem.WorkItem,
+                    RepositoryMapping = targetMapping,
+                    ResolutionSource = RepositoryResolutionSource.WorkItemArtifactLink,
+                    MatchingRelations = matchingRelations
+                });
+                continue;
+            }
+
+            if (includeUnresolved)
+            {
+                results.Add(new RepositoryWorkItem
+                {
+                    WorkItem = workItem.WorkItem,
+                    RepositoryMapping = null,
+                    ResolutionSource = RepositoryResolutionSource.Unresolved,
+                    MatchingRelations = new List<WorkItemRelationInfo>()
+                });
+            }
+        }
+
+        return results;
     }
 
     /// <summary>
@@ -181,23 +298,27 @@ public class WorkItemTool
 
     private async Task<(RepositoryMapping? Mapping, RepositoryResolutionSource Source)> ResolveRepositoryMappingAsync(
         WorkItemWithRelations workItem,
-        WorkItemWithRelations? parentWorkItem)
+        WorkItemWithRelations? parentWorkItem,
+        bool allowDefaultFallback)
     {
         var windowsUsername = GetCurrentWindowsUsername();
         var mappings = await _repositoryMappingService.GetAllRepositoryMappingsAsync(windowsUsername);
 
-        var workItemRepositoryId = GetFirstRepositoryId(workItem.Relations);
-        var workItemMapping = FindMappingByRepositoryId(mappings, workItemRepositoryId);
+        var workItemMapping = FindMappingByRelations(mappings, workItem.Relations);
         if (workItemMapping != null)
         {
             return (workItemMapping, RepositoryResolutionSource.WorkItemArtifactLink);
         }
 
-        var parentRepositoryId = parentWorkItem == null ? null : GetFirstRepositoryId(parentWorkItem.Relations);
-        var parentMapping = FindMappingByRepositoryId(mappings, parentRepositoryId);
+        var parentMapping = parentWorkItem == null ? null : FindMappingByRelations(mappings, parentWorkItem.Relations);
         if (parentMapping != null)
         {
             return (parentMapping, RepositoryResolutionSource.ParentWorkItemArtifactLink);
+        }
+
+        if (!allowDefaultFallback)
+        {
+            return (null, RepositoryResolutionSource.Unresolved);
         }
 
         var defaultMapping = await _repositoryMappingService.GetDefaultRepositoryMappingAsync(windowsUsername);
@@ -206,20 +327,40 @@ public class WorkItemTool
             : (defaultMapping, RepositoryResolutionSource.UserDefaultRepositoryMapping);
     }
 
-    private static string? GetFirstRepositoryId(IEnumerable<WorkItemRelationInfo> relations)
+    private static RepositoryMapping? FindMappingByRelations(
+        IEnumerable<RepositoryMapping> mappings,
+        IEnumerable<WorkItemRelationInfo> relations)
     {
-        return relations.FirstOrDefault(relation => !string.IsNullOrEmpty(relation.RepositoryId))?.RepositoryId;
+        return mappings.FirstOrDefault(mapping => GetMatchingRepositoryRelations(relations, mapping).Any());
     }
 
-    private static RepositoryMapping? FindMappingByRepositoryId(IEnumerable<RepositoryMapping> mappings, string? repositoryId)
+    private static IEnumerable<WorkItemRelationInfo> GetMatchingRepositoryRelations(
+        IEnumerable<WorkItemRelationInfo> relations,
+        RepositoryMapping mapping)
     {
-        if (string.IsNullOrEmpty(repositoryId))
+        return relations.Where(relation => MatchesRepository(relation, mapping));
+    }
+
+    private static bool MatchesRepository(WorkItemRelationInfo relation, RepositoryMapping mapping)
+    {
+        if (!string.IsNullOrWhiteSpace(relation.RepositoryProvider) &&
+            relation.RepositoryProvider.Equals(mapping.RepositoryProvider, StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(relation.RepositoryOwner) &&
+            relation.RepositoryOwner.Equals(mapping.RepositoryOwner, StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(relation.RepositoryName) &&
+            relation.RepositoryName.Equals(mapping.RepositoryName, StringComparison.OrdinalIgnoreCase))
         {
-            return null;
+            return true;
         }
 
-        return mappings.FirstOrDefault(mapping =>
-            mapping.RepositoryId.Equals(repositoryId, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(relation.RepositoryId) &&
+            !string.IsNullOrWhiteSpace(mapping.RepositoryId) &&
+            relation.RepositoryId.Equals(mapping.RepositoryId, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private string GetCurrentWindowsUsername()
