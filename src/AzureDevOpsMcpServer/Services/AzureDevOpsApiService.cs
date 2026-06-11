@@ -89,10 +89,10 @@ public class AzureDevOpsApiService : IAzureDevOpsApiService
             Query = $@"
                 SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo], 
                        [System.WorkItemType], [System.Description], [System.CreatedDate], 
-                       [System.ChangedDate], [System.Project]
+                       [System.ChangedDate], [System.TeamProject]
                 FROM WorkItems
                 WHERE [System.AssignedTo] = '{userId}'
-                  AND [System.Project] = '{projectId}'
+                  AND [System.TeamProject] = '{projectId}'
                   AND [System.State] <> 'Closed'
                   AND [System.State] <> 'Removed'
                 ORDER BY [System.ChangedDate] DESC"
@@ -109,9 +109,17 @@ public class AzureDevOpsApiService : IAzureDevOpsApiService
 
             // 批量获取 WorkItem 详情
             var workItemIds = result.WorkItems.Select(wi => wi.Id).ToList();
-            var workItems = await witClient.GetWorkItemsAsync(workItemIds, null, result.AsOf);
+            // 批量获取 WorkItem 详情，每次最多 200 个避免 URI 过长
+            const int batchSize = 200;
+            var allWorkItems = new List<WorkItem>();
+            for (int i = 0; i < workItemIds.Count; i += batchSize)
+            {
+                var batch = workItemIds.Skip(i).Take(batchSize).ToList();
+                var batchResult = await witClient.GetWorkItemsAsync(batch, null, result.AsOf);
+                allWorkItems.AddRange(batchResult);
+            }
 
-            return workItems.Select(ConvertToTaskItem);
+            return allWorkItems.Select(ConvertToTaskItem);
         }
         catch (Exception ex)
         {
@@ -184,9 +192,17 @@ public class AzureDevOpsApiService : IAzureDevOpsApiService
             }
 
             var workItemIds = result.WorkItems.Select(wi => wi.Id).ToList();
-            var workItems = await witClient.GetWorkItemsAsync(workItemIds, null, result.AsOf);
+            // 批量获取 WorkItem 详情，每次最多 200 个避免 URI 过长
+            const int batchSize = 200;
+            var allWorkItems = new List<WorkItem>();
+            for (int i = 0; i < workItemIds.Count; i += batchSize)
+            {
+                var batch = workItemIds.Skip(i).Take(batchSize).ToList();
+                var batchResult = await witClient.GetWorkItemsAsync(batch, null, result.AsOf);
+                allWorkItems.AddRange(batchResult);
+            }
 
-            return workItems.Select(ConvertToTaskItem);
+            return allWorkItems.Select(ConvertToTaskItem);
         }
         catch (Exception ex)
         {
@@ -353,8 +369,16 @@ public class AzureDevOpsApiService : IAzureDevOpsApiService
         
         try
         {
-            var repo = await gitClient.GetRepositoryAsync(projectId, repositoryId);
-            return ConvertToRepositoryInfo(repo);
+            // 尝试用 GUID 重载避免含空格名称导致的路由问题
+            if (Guid.TryParse(repositoryId, out var repoGuid)
+                && Guid.TryParse(projectId, out var projGuid))
+            {
+                var repo = await gitClient.GetRepositoryAsync(projGuid, repoGuid);
+                return ConvertToRepositoryInfo(repo);
+            }
+
+            var repo2 = await gitClient.GetRepositoryAsync(projectId, repositoryId);
+            return ConvertToRepositoryInfo(repo2);
         }
         catch (Exception ex)
         {
