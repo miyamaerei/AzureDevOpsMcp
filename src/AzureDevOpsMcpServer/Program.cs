@@ -1,7 +1,7 @@
 using AzureDevOpsMcpServer.Configuration;
 using AzureDevOpsMcpServer.Middleware;
+using AzureDevOpsMcpServer.PublicApi;
 using AzureDevOpsMcpServer.Services;
-using AzureDevOpsMcpServer.Tools;
 using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -49,18 +49,14 @@ if (!string.IsNullOrEmpty(orgUrl) && !string.IsNullOrEmpty(pat))
     builder.Services.AddScoped<IAzureDevOpsApiService, AzureDevOpsApiService>();
     
     mcpServerBuilder
-            .WithTools<WorkItemTool>()
-            .WithTools<RepositoryMappingTool>()
-            .WithTools<SyncTaskTool>();
+            .WithTools<AzureDevOpsPublicApi>();
 }
 else
 {
     builder.Services.AddScoped<IAzureDevOpsService, AzureDevOpsService>();
     
     mcpServerBuilder
-        .WithTools<WorkItemTool>()
-        .WithTools<RepositoryMappingTool>()
-        .WithTools<SyncTaskTool>();
+        .WithTools<AzureDevOpsPublicApi>();
 }
 
 // Add services

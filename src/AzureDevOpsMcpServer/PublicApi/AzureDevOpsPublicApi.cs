@@ -3,26 +3,72 @@ using AzureDevOpsMcpServer.Models;
 using AzureDevOpsMcpServer.Services;
 using ModelContextProtocol.Server;
 
-namespace AzureDevOpsMcpServer.Tools;
+namespace AzureDevOpsMcpServer.PublicApi;
 
 /// <summary>
-/// Azure DevOps WorkItem MCP 工具
-/// 提供获取当前仓库关联任务的功能
+/// Azure DevOps MCP 公共 API
+/// 提供与 Azure DevOps 集成的核心对外接口
 /// </summary>
-public class WorkItemTool
+public class AzureDevOpsPublicApi
 {
-    private readonly IAzureDevOpsApiService _apiService;
     private readonly RepositoryMappingService _repositoryMappingService;
     private readonly IUserContext _userContext;
+    private readonly IAzureDevOpsApiService _apiService;
+    private readonly ITaskSyncService _taskSyncService;
 
-    public WorkItemTool(
-        IAzureDevOpsApiService apiService,
+    public AzureDevOpsPublicApi(
         RepositoryMappingService repositoryMappingService,
-        IUserContext userContext)
+        IUserContext userContext,
+        IAzureDevOpsApiService apiService,
+        ITaskSyncService taskSyncService)
     {
-        _apiService = apiService;
         _repositoryMappingService = repositoryMappingService;
         _userContext = userContext;
+        _apiService = apiService;
+        _taskSyncService = taskSyncService;
+    }
+
+    /// <summary>
+    /// 设置仓库映射关系
+    /// </summary>
+    [McpServerTool]
+    [Description("配置本地 Git 仓库与 Azure DevOps Project 的映射关系")]
+    public async Task<RepositoryMapping> SetRepositoryMapping(
+        [Description("本地项目/仓库名称")] string localProject,
+        [Description("Azure DevOps Project ID")] string azureProjectId,
+        [Description("Azure DevOps Project 名称")] string azureProjectName,
+        [Description("仓库 ID")] string repositoryId,
+        [Description("仓库名称")] string repositoryName,
+        [Description("仓库远程地址")] string remoteUrl,
+        [Description("组织名称")] string organization,
+        [Description("本地 Git 仓库工作目录")] string workingDirectory,
+        [Description("是否设为默认映射")] bool isDefault = false,
+        [Description("仓库提供方，例如 GitHub 或 AzureRepos")] string repositoryProvider = "AzureRepos",
+        [Description("仓库所有者；GitHub 场景为 owner/organization")] string? repositoryOwner = null)
+    {
+        var windowsUsername = _userContext.CurrentWindowsUsername
+            ?? throw new InvalidOperationException("无法获取当前 Windows 用户名");
+
+        var azureDevOpsUser = await _userContext.GetCurrentAzureDevOpsUserAsync()
+            ?? throw new InvalidOperationException("无法获取当前 Azure DevOps 用户");
+
+        var mapping = await _repositoryMappingService.CreateOrUpdateRepositoryMappingAsync(
+            windowsUsername: windowsUsername,
+            azureDevOpsUser: azureDevOpsUser,
+            localProjectName: localProject,
+            workingDirectory: workingDirectory,
+            azureDevOpsProjectId: azureProjectId,
+            azureDevOpsProjectName: azureProjectName,
+            repositoryId: repositoryId,
+            repositoryName: repositoryName,
+            remoteUrl: remoteUrl,
+            organization: organization,
+            isDefault: isDefault,
+            machineName: Environment.MachineName,
+            repositoryProvider: repositoryProvider,
+            repositoryOwner: repositoryOwner ?? organization);
+
+        return mapping;
     }
 
     /// <summary>
@@ -34,7 +80,6 @@ public class WorkItemTool
         [Description("是否包含无法解析仓库关系的 WorkItem，默认 false")]
         bool includeUnresolved = false)
     {
-        // 自动获取当前用户
         var userId = await _userContext.GetCurrentAzureDevOpsUserAsync()
             ?? throw new InvalidOperationException("无法获取当前用户");
 
@@ -45,8 +90,22 @@ public class WorkItemTool
     }
 
     /// <summary>
-    /// 根据仓库映射获取指派给当前用户的 WorkItem 列表
+    /// 同步指定任务到 Azure DevOps
     /// </summary>
+    [McpServerTool]
+    [Description("将指定任务同步到 Azure DevOps")]
+    public async Task<SyncResult> SyncTaskToAzureDevOps(
+        [Description("任务 ID")] Guid taskId)
+    {
+        bool success = await _taskSyncService.SyncTaskToAzureDevOpsAsync(taskId);
+
+        return new SyncResult
+        {
+            Success = success,
+            Message = success ? "同步成功" : "同步失败"
+        };
+    }
+
     private async Task<IEnumerable<RepositoryWorkItem>> GetAssignedWorkItemsForRepositoryMapping(
         string userId,
         RepositoryMapping targetMapping,
@@ -101,9 +160,6 @@ public class WorkItemTool
         return results;
     }
 
-    /// <summary>
-    /// 获取与仓库映射匹配的关联关系
-    /// </summary>
     private static IEnumerable<WorkItemRelationInfo> GetMatchingRepositoryRelations(
         IEnumerable<WorkItemRelationInfo> relations,
         RepositoryMapping mapping)
@@ -111,9 +167,6 @@ public class WorkItemTool
         return relations.Where(relation => MatchesRepository(relation, mapping));
     }
 
-    /// <summary>
-    /// 判断关联关系是否匹配仓库映射
-    /// </summary>
     private static bool MatchesRepository(WorkItemRelationInfo relation, RepositoryMapping mapping)
     {
         if (!string.IsNullOrWhiteSpace(relation.RepositoryProvider) &&
@@ -136,12 +189,25 @@ public class WorkItemTool
         return false;
     }
 
-    /// <summary>
-    /// 获取当前 Windows 用户名
-    /// </summary>
     private string GetCurrentWindowsUsername()
     {
         return _userContext.CurrentWindowsUsername
             ?? throw new InvalidOperationException("无法获取当前 Windows 用户名");
     }
+}
+
+/// <summary>
+/// 同步结果
+/// </summary>
+public class SyncResult
+{
+    /// <summary>
+    /// 是否成功
+    /// </summary>
+    public bool Success { get; set; }
+
+    /// <summary>
+    /// 结果消息
+    /// </summary>
+    public string Message { get; set; } = string.Empty;
 }
