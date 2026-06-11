@@ -8,6 +8,7 @@ public class AppDbContext : DbContext
     public DbSet<TaskItem> Tasks { get; set; } = null!;
     public DbSet<Project> Projects { get; set; } = null!;
     public DbSet<ProjectMapping> ProjectMappings { get; set; } = null!;
+    public DbSet<RepositoryMapping> RepositoryMappings { get; set; } = null!;
     public DbSet<TaskStateHistory> TaskHistories { get; set; } = null!;
     public DbSet<UserMapping> UserMappings { get; set; } = null!;
     public DbSet<TaskSyncRecord> TaskSyncRecords { get; set; } = null!;
@@ -36,6 +37,16 @@ public class AppDbContext : DbContext
         
         modelBuilder.Entity<ProjectMapping>()
             .HasIndex(pm => pm.AzureDevOpsProjectId);
+
+        modelBuilder.Entity<RepositoryMapping>()
+            .HasIndex(rm => new { rm.WindowsUsername, rm.LocalProjectName })
+            .IsUnique();
+
+        modelBuilder.Entity<RepositoryMapping>()
+            .HasIndex(rm => new { rm.WindowsUsername, rm.WorkingDirectory });
+
+        modelBuilder.Entity<RepositoryMapping>()
+            .HasIndex(rm => new { rm.WindowsUsername, rm.RepositoryId });
         
         modelBuilder.Entity<UserMapping>()
             .HasIndex(um => um.WindowsUsername)

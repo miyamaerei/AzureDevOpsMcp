@@ -60,6 +60,19 @@ public class CachedAzureDevOpsApiService : ICachedAzureDevOpsApiService
     }
 
     /// <summary>
+    /// 获取带代码资产关系的任务详情（带缓存）
+    /// </summary>
+    public async Task<WorkItemWithRelations?> GetWorkItemDetailsWithRelationsAsync(int workItemId)
+    {
+        var cacheKey = $"taskWithRelations:{workItemId}";
+
+        return await _cacheService.GetOrCreateAsync(cacheKey, async () =>
+        {
+            return await _apiService.GetWorkItemDetailsWithRelationsAsync(workItemId);
+        }, _taskCacheExpiration);
+    }
+
+    /// <summary>
     /// 更新任务状态（清除缓存）
     /// </summary>
     public async Task<TaskItem?> UpdateWorkItemStateAsync(int workItemId, string state)
@@ -95,6 +108,14 @@ public class CachedAzureDevOpsApiService : ICachedAzureDevOpsApiService
         {
             return await _apiService.GetTaskHistoryAsync(workItemId);
         }, _taskCacheExpiration);
+    }
+
+    /// <summary>
+    /// 添加 WorkItem 评论（不缓存）
+    /// </summary>
+    public async Task<CommentInfo> AddWorkItemCommentAsync(int workItemId, string projectName, string text)
+    {
+        return await _apiService.AddWorkItemCommentAsync(workItemId, projectName, text);
     }
 
     /// <summary>

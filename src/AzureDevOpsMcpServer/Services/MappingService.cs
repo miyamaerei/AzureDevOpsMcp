@@ -78,6 +78,19 @@ public class MappingService
         string? workingDirectory = null,
         bool isDefault = false)
     {
+        if (isDefault)
+        {
+            var defaultMappings = await _dbContext.ProjectMappings
+                .Where(pm => pm.IsDefault && !pm.LocalProjectName.Equals(localProjectName))
+                .ToListAsync();
+
+            foreach (var mapping in defaultMappings)
+            {
+                mapping.IsDefault = false;
+                mapping.UpdatedAt = DateTime.UtcNow;
+            }
+        }
+
         var existingMapping = await GetMappingByLocalProjectAsync(localProjectName);
         
         if (existingMapping != null)

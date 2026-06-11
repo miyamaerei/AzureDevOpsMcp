@@ -25,6 +25,10 @@ public class AzureDevOpsConnection : IDisposable
         _personalAccessToken = personalAccessToken;
     }
 
+    public string OrganizationUrl => _organizationUrl;
+
+    public string PersonalAccessToken => _personalAccessToken;
+
     /// <summary>
     /// 获取或创建 VssConnection 实例
     /// </summary>

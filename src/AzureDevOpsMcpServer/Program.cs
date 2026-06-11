@@ -53,6 +53,7 @@ if (!string.IsNullOrEmpty(orgUrl) && !string.IsNullOrEmpty(pat))
             .WithTools<ProjectRepositoryTool>()
             .WithTools<TaskHistoryTool>()
             .WithTools<ProjectMappingTool>()
+            .WithTools<RepositoryMappingTool>()
             .WithTools<UserMappingTool>()
             .WithTools<SyncTaskTool>()
             .WithTools<MonitoringTool>()
@@ -65,6 +66,7 @@ else
     mcpServerBuilder
         .WithTools<AzureDevOpsTool>()
         .WithTools<ProjectMappingTool>()
+        .WithTools<RepositoryMappingTool>()
         .WithTools<UserMappingTool>()
         .WithTools<MonitoringTool>()
         .WithTools<ProjectManagerTool>();
@@ -72,6 +74,7 @@ else
 
 // Add services
 builder.Services.AddScoped<MappingService>();
+builder.Services.AddScoped<RepositoryMappingService>();
 builder.Services.AddScoped<UserMappingService>();
 builder.Services.AddScoped<IUserContext, UserContext>();
 builder.Services.AddScoped<ITaskSyncService, TaskSyncService>();

@@ -137,4 +137,25 @@ public class MappingServiceTests
 
         Assert.False(result);
     }
+
+    [Fact]
+    public async Task SetDefaultMapping_WhenAnotherDefaultExists_OnlyNewOneIsDefault()
+    {
+        // Issue #1429570 acceptance criterion: only one project mapping can be default at a time
+        using var dbContext = CreateInMemoryDbContext();
+        var service = new MappingService(dbContext);
+
+        await service.CreateOrUpdateMappingAsync(
+            "ProjectA", "azure-1", "Azure Project A", "test-org", isDefault: true);
+
+        await service.CreateOrUpdateMappingAsync(
+            "ProjectB", "azure-2", "Azure Project B", "test-org", isDefault: true);
+
+        var defaultMapping = await service.GetDefaultMappingAsync();
+        Assert.NotNull(defaultMapping);
+        Assert.Equal("ProjectB", defaultMapping!.LocalProjectName);
+
+        var allMappings = await service.GetAllMappingsAsync();
+        Assert.Single(allMappings, m => m.IsDefault);
+    }
 }

@@ -1,3 +1,6 @@
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 using AzureDevOpsMcpServer.Models;
 using Microsoft.TeamFoundation.Core.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
@@ -15,8 +18,12 @@ public interface IAzureDevOpsApiService
     // WorkItem 操作
     Task<IEnumerable<TaskItem>> GetAssignedWorkItemsAsync(string userId, string projectId);
     Task<TaskItem?> GetWorkItemDetailsAsync(int workItemId);
+    Task<WorkItemWithRelations?> GetWorkItemDetailsWithRelationsAsync(int workItemId);
     Task<TaskItem?> UpdateWorkItemStateAsync(int workItemId, string state);
     Task<IEnumerable<TaskItem>> QueryWorkItemsAsync(string wiqlQuery, string projectId);
+    
+    // WorkItem 评论操作
+    Task<CommentInfo> AddWorkItemCommentAsync(int workItemId, string projectName, string text);
     
     // TaskHistory 操作
     Task<IEnumerable<TaskStateHistory>> GetTaskHistoryAsync(int workItemId);
@@ -44,11 +51,24 @@ public class RepositoryInfo
 }
 
 /// <summary>
+/// WorkItem 评论信息
+/// </summary>
+public class CommentInfo
+{
+    public int Id { get; set; }
+    public int Version { get; set; }
+    public string Text { get; set; } = string.Empty;
+    public string CreatedBy { get; set; } = string.Empty;
+    public DateTime CreatedDate { get; set; }
+}
+
+/// <summary>
 /// Azure DevOps 真实 API 服务实现
 /// </summary>
 public class AzureDevOpsApiService : IAzureDevOpsApiService
 {
     private readonly AzureDevOpsConnection _connection;
+    private readonly HttpClient _httpClient;
     private WorkItemTrackingHttpClient? _witClient;
     private ProjectHttpClient? _projectClient;
     private GitHttpClient? _gitClient;
@@ -56,6 +76,13 @@ public class AzureDevOpsApiService : IAzureDevOpsApiService
     public AzureDevOpsApiService(AzureDevOpsConnection connection)
     {
         _connection = connection;
+        _httpClient = new HttpClient();
+
+        var authBytes = Encoding.ASCII.GetBytes($":{connection.PersonalAccessToken}");
+        _httpClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Basic", Convert.ToBase64String(authBytes));
+        _httpClient.DefaultRequestHeaders.Accept.Add(
+            new MediaTypeWithQualityHeaderValue("application/json"));
     }
 
     private WorkItemTrackingHttpClient GetWitClient()
@@ -146,6 +173,38 @@ public class AzureDevOpsApiService : IAzureDevOpsApiService
     }
 
     /// <summary>
+    /// 获取带代码资产关系的 WorkItem 详情。
+    /// </summary>
+    public async Task<WorkItemWithRelations?> GetWorkItemDetailsWithRelationsAsync(int workItemId)
+    {
+        var witClient = GetWitClient();
+
+        try
+        {
+            var workItem = await witClient.GetWorkItemAsync(workItemId, expand: WorkItemExpand.Relations);
+            var taskItem = ConvertToTaskItem(workItem);
+            var relations = workItem.Relations?
+                .Select(relation => WorkItemRelationInfo.FromAzureDevOpsRelation(
+                    relation.Rel,
+                    relation.Attributes != null && relation.Attributes.TryGetValue("name", out var name)
+                        ? name?.ToString() ?? string.Empty
+                        : string.Empty,
+                    relation.Url))
+                .ToList() ?? new List<WorkItemRelationInfo>();
+
+            return new WorkItemWithRelations
+            {
+                WorkItem = taskItem,
+                Relations = relations
+            };
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"获取 WorkItem 关系失败: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
     /// 更新 WorkItem 状态
     /// </summary>
     public async Task<TaskItem?> UpdateWorkItemStateAsync(int workItemId, string state)
@@ -170,6 +229,46 @@ public class AzureDevOpsApiService : IAzureDevOpsApiService
         catch (Exception ex)
         {
             throw new InvalidOperationException($"更新 WorkItem 状态失败: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// 给 WorkItem 添加 UI 可见的评论（Discussion）
+    /// </summary>
+    public async Task<CommentInfo> AddWorkItemCommentAsync(int workItemId, string projectName, string text)
+    {
+        try
+        {
+            var orgUrl = _connection.GetConnection().Uri.ToString().TrimEnd('/');
+            var encodedProject = Uri.EscapeDataString(projectName);
+            var url = $"{orgUrl}/{encodedProject}/_apis/wit/workItems/{workItemId}/comments?api-version=7.1-preview.4";
+
+            var payload = JsonSerializer.Serialize(new { text });
+            var content = new StringContent(payload, Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PostAsync(url, content);
+            response.EnsureSuccessStatusCode();
+
+            var responseBody = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(responseBody);
+            var root = doc.RootElement;
+
+            return new CommentInfo
+            {
+                Id = root.GetProperty("id").GetInt32(),
+                Version = root.GetProperty("version").GetInt32(),
+                Text = root.GetProperty("text").GetString() ?? string.Empty,
+                CreatedBy = root.TryGetProperty("createdBy", out var createdBy)
+                    ? createdBy.GetProperty("displayName").GetString() ?? string.Empty
+                    : string.Empty,
+                CreatedDate = root.TryGetProperty("createdDate", out var createdDate)
+                    ? createdDate.GetDateTime()
+                    : DateTime.UtcNow
+            };
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"添加 WorkItem 评论失败: {ex.Message}", ex);
         }
     }
 
@@ -369,16 +468,8 @@ public class AzureDevOpsApiService : IAzureDevOpsApiService
         
         try
         {
-            // 尝试用 GUID 重载避免含空格名称导致的路由问题
-            if (Guid.TryParse(repositoryId, out var repoGuid)
-                && Guid.TryParse(projectId, out var projGuid))
-            {
-                var repo = await gitClient.GetRepositoryAsync(projGuid, repoGuid);
-                return ConvertToRepositoryInfo(repo);
-            }
-
-            var repo2 = await gitClient.GetRepositoryAsync(projectId, repositoryId);
-            return ConvertToRepositoryInfo(repo2);
+            var repo = await gitClient.GetRepositoryAsync(projectId, repositoryId);
+            return ConvertToRepositoryInfo(repo);
         }
         catch (Exception ex)
         {
